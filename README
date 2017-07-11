@@ -1,4 +1,7 @@
-Python script to convert a folder of Dutch archaeological reports (PDFs) to XML files nested by section, chapter, heading. Edit
+Python script to convert a folder of Dutch archaeological reports (PDFs) to XML files nested by section, chapter, heading.
 
-Requires pdf-extract, pdftohtml
+Requires:
+
+- pdf-extract (https://github.com/CrossRef/pdfextract)
+- pdftohtml (http://pdftohtml.sourceforge.net/)
 
