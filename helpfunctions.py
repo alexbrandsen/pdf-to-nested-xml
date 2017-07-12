@@ -1,5 +1,10 @@
-import sys
 import re
+
+# import element tree; to parse xml
+try:
+    import xml.etree.cElementTree as ET
+except ImportError:
+    import xml.etree.ElementTree as ET
 
 #import subprocess; to call pdf-extract
 import subprocess
@@ -20,28 +25,7 @@ logger.addHandler(hdlr)
 logger.setLevel(logging.WARNING)
 
 
-#to remove invalid characters
-def invalid_xml_remove(c,replacement = ' '):
-    #http://stackoverflow.com/questions/1707890/fast-way-to-filter-illegal-xml-unicode-chars-in-python
-    illegal_unichrs = [ (0x00, 0x08), (0x0B, 0x1F), (0x7F, 0x84), (0x86, 0x9F),
-                    (0xD800, 0xDFFF), (0xFDD0, 0xFDDF), (0xFFFE, 0xFFFF),
-                    (0x1FFFE, 0x1FFFF), (0x2FFFE, 0x2FFFF), (0x3FFFE, 0x3FFFF),
-                    (0x4FFFE, 0x4FFFF), (0x5FFFE, 0x5FFFF), (0x6FFFE, 0x6FFFF),
-                    (0x7FFFE, 0x7FFFF), (0x8FFFE, 0x8FFFF), (0x9FFFE, 0x9FFFF),
-                    (0xAFFFE, 0xAFFFF), (0xBFFFE, 0xBFFFF), (0xCFFFE, 0xCFFFF),
-                    (0xDFFFE, 0xDFFFF), (0xEFFFE, 0xEFFFF), (0xFFFFE, 0xFFFFF),
-                    (0x10FFFE, 0x10FFFF) ]
 
-    illegal_ranges = ["%s-%s" % (unichr(low), unichr(high))
-                  for (low, high) in illegal_unichrs
-                  if low < sys.maxunicode]
-
-    illegal_xml_re = re.compile(u'[%s]' % u''.join(illegal_ranges))
-    if illegal_xml_re.search(c) is not None:
-        #Replace with replacement
-        return replacement
-    else:
-        return c
 
 #indents xml output
 #not great, but better than unformatted xml
@@ -194,42 +178,41 @@ def pdf2xml1file(file):
         else:
             print "Converted " + file + " to xml!"
     else:
-        print file + " already exists, skipping"
+        print file.replace('pdf/','xml/').replace('.pdf', '.xml') + " already exists, skipping"
 
     #then do html conversion
+    # TODO maybe use md5 of file for folder name to stop clashes?
     htmlDir = 'html/' + file.replace('.pdf', '').replace('pdf/', '')
     if not os.path.isdir(htmlDir):
         # first create folder for html to go in
-        # TODO maybe use md5 of file for folder name to stop clashes?
-        os.mkdir(htmlDir)
+
+        _mkdir(htmlDir)
+
         try:
-            cmnd = 'pdftohtml -c ' + file.replace(' ', '\ ') + ' ' + htmlDir + '/index.html'
-            print cmnd
-            exit(1)
+            cmnd = 'pdftohtml -c -nodrm ' + file.replace(' ', '\ ') + ' ' + htmlDir + '/index.html'
             output = subprocess.check_output(
                 cmnd, stderr=subprocess.STDOUT, shell=True,
                 universal_newlines=True)
         except subprocess.CalledProcessError as exc:
-            if "undefined method `*' for nil:NilClass" in exc.output:
-                #problem with reference extraction, try without reference extraction
-                try:
-                    cmnd = 'pdf-extract extract --headers --footers --no-lines --regions --set char_slop:0.4 ' + file.replace(
-                        ' ', '\ ') + ' > ' + file.replace('pdf/', 'xml/').replace('.pdf', '.xml').replace(' ', '\ ')
-                    output = subprocess.check_output(
-                        cmnd, stderr=subprocess.STDOUT, shell=True,
-                        universal_newlines=True)
-                except subprocess.CalledProcessError as exc:
-                    #still an error present
-                    errormsg = "pdf-extract error for file " + file + " " + exc.output
-                else:
-                    print "Converted " + file + " to xml! (no references)"
-            else:
-                errormsg = "pdf-extract error for file " + file + " " + exc.output
+            errormsg = "pdftohtml error for file " + file + " " + exc.output
+            print errormsg
+            logger.error(errormsg)
+            os.rmdir(htmlDir)
+        else:
+            print "Converted " + file + " to html!"
 
-            if errormsg:
-                # error in pdf-extract, discard output file and write to log
-                print errormsg
-                logger.error(errormsg)
-                os.remove(file.replace('pdf/','xml/').replace('.pdf', '.xml'))
     else:
         print file + " html folder already exists, skipping"
+
+
+def _mkdir(_dir):
+    if os.path.isdir(_dir): pass
+    elif os.path.isfile(_dir):
+        raise OSError("%s exists as a regular file." % _dir)
+    else:
+        parent, directory = os.path.split(_dir)
+        if parent and not os.path.isdir(parent): _mkdir(parent)
+        if directory: os.mkdir(_dir)
+
+
+
